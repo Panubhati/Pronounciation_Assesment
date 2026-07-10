@@ -1,36 +1,23 @@
-"""
-FastAPI entrypoint.
-
-DPDP-relevant design decisions live here, not in a policy doc:
-  - Audio is written to a temp file only for the duration of processing,
-    inside a try/finally that deletes it even if the pipeline throws.
-  - Nothing is written to a database. No user ID, no history endpoint.
-  - We do not log audio bytes or transcripts; only request metadata
-    (timing, status code) goes to stdout via uvicorn's default logging.
-  - CORS is locked to the deployed frontend origin in production -- see
-    ALLOWED_ORIGINS below, set via env var at deploy time.
-"""
 import os
 import subprocess
 import tempfile
 import time
 
-# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, File, HTTPException, UploadFile
-# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
-# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 from app.pipeline.pipeline import run_pipeline
 
+# Audio must be between 30-45 seconds; uploads capped at ~15MB to prevent abuse.
 MIN_DURATION_S = 30
 MAX_DURATION_S = 45
-MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15MB is generous headroom for a 45s clip
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 app = FastAPI(title="Livo Pronunciation Assessment API")
 
-allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+# Allow requests only from trusted frontend origins; configurable via env var for production.
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")  # CORS whitelist
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -39,6 +26,7 @@ app.add_middleware(
 )
 
 
+# Pydantic models define phoneme, word, and response shapes returned to the frontend.
 class PhonemeOut(BaseModel):
     phoneme: str
     score: float
@@ -101,9 +89,10 @@ async def analyze(file: UploadFile = File(...)):
     if file.content_type not in ("audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3", "audio/webm", "audio/ogg"):
         raise HTTPException(400, f"Unsupported content type: {file.content_type}")
 
-    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav" 
     tmp_path = None
     wav_path = None
+    # Write upload to a temp file; delete=False so we control cleanup in finally.
     try:
         contents = await file.read()
         if len(contents) > MAX_UPLOAD_BYTES:
@@ -112,27 +101,24 @@ async def analyze(file: UploadFile = File(...)):
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(contents)
             tmp_path = tmp.name
-        # Drop our only other reference to the raw bytes as soon as they're
-        # on disk for processing -- nothing keeps them in memory longer
-        # than necessary.
-        del contents
+        del contents  # free memory
 
-        # Convert non-WAV formats (e.g. browser-recorded .webm) to WAV
-        # so torchaudio and the pipeline can handle them.
+        # Convert browser-recorded webm/mp3 to 16kHz mono WAV that the pipeline expects.
         if suffix.lower() not in (".wav",):
             wav_path = _convert_to_wav(tmp_path)
             process_path = wav_path
         else:
             process_path = tmp_path
 
-        duration = _get_duration_seconds(process_path)
+        duration = _get_duration_seconds(process_path)  # validate length
         if not (MIN_DURATION_S <= duration <= MAX_DURATION_S):
             raise HTTPException(
                 400,
                 f"Audio must be {MIN_DURATION_S}-{MAX_DURATION_S}s long (got {duration:.1f}s).",
             )
 
-        result = run_pipeline(process_path)
+        # Run the full ASR → G2P → align → GOP score pipeline and stream back results.
+        result = run_pipeline(process_path)  # score audio
 
         return AnalyzeResponse(
             overall_score=result.overall_score,
@@ -148,11 +134,12 @@ async def analyze(file: UploadFile = File(...)):
                 for w in result.words
             ],
         )
-    finally:
-        # DPDP: delete the temp audio file regardless of success/failure.
-        # This is the entire "retention policy" for raw audio -- it does
-        # not outlive the request that processes it.
+    finally:  # always cleanup
+        # Temp audio files are deleted after every request — no user data is retained.
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
         if wav_path and os.path.exists(wav_path):
             os.remove(wav_path)
+
+
+
