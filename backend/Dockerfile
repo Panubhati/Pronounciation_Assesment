@@ -16,11 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-# Warm the model cache at build time so the first real request isn't the
-# one paying for a multi-hundred-MB download -- trades a slower image
-# build for a faster cold start in production.
-RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base.en', device='cpu', compute_type='int8')"
-RUN python -c "from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor; m='facebook/wav2vec2-lv-60-espeak-cv-ft'; Wav2Vec2Processor.from_pretrained(m); Wav2Vec2ForCTC.from_pretrained(m)"
-
 EXPOSE 8001
 CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}
