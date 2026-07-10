@@ -3,6 +3,11 @@ import subprocess
 import tempfile
 import time
 
+# Fix PyTorch/OpenMP duplicate library conflict on Windows.
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+# Tell phonemizer where espeak-ng is installed on this machine.
+os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
