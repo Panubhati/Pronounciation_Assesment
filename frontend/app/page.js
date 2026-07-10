@@ -2,16 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Audio must be 30-45 seconds; backend URL read from env or falls back to localhost.
 const MIN_DURATION = 30;
 const MAX_DURATION = 45;
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Maps a 0-100 score to a CSS variable: green ≥ 80, yellow ≥ 60, red below.
 function scoreColor(score) {
   if (score >= 80) return "var(--good)";
   if (score >= 60) return "var(--caution)";
   return "var(--flagged)";
 }
 
+// Returns a one-sentence summary of the overall pronunciation session score.
 function getOverallFeedback(score) {
   if (score >= 80) {
     return "Strong clarity. Most words should be easy for a listener to understand.";
@@ -22,6 +25,7 @@ function getOverallFeedback(score) {
   return "Needs practice. Slow down, speak a little louder, and repeat the red words.";
 }
 
+// Derives a label, explanation, and next-step tip for a single word based on its score and flag.
 function getWordFeedback(word) {
   const score = Math.round(word.score);
   const flag = word.flag || "";
@@ -57,6 +61,7 @@ function getWordFeedback(word) {
   };
 }
 
+// Reads audio duration client-side using the browser Audio element to validate before uploading.
 function getAudioDuration(file) {
   return new Promise((resolve, reject) => {
     const audio = document.createElement("audio");
@@ -82,12 +87,14 @@ export default function Page() {
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
 
+  // Refs hold MediaRecorder, audio chunks, the file input, and both interval timers.
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const fileInputRef = useRef(null);
   const timerRef = useRef(null);
   const analysisTimerRef = useRef(null);
 
+  // Step labels shown in the UI during analysis to indicate pipeline progress.
   const ANALYSIS_STEPS = [
     "Uploading audio...",
     "Transcribing speech...",
@@ -113,6 +120,7 @@ export default function Page() {
     if (picked) handleFilePicked(picked);
   };
 
+  // Requests microphone access, starts MediaRecorder, and auto-stops at MAX_DURATION seconds.
   const startRecording = async () => {
     setError(null);
     setResult(null);
@@ -155,9 +163,11 @@ export default function Page() {
 
   useEffect(() => () => clearInterval(timerRef.current), []);
 
+  // Submission is only allowed when file is valid, duration passes, and consent is checked.
   const durationInRange = duration != null && duration >= MIN_DURATION && duration <= MAX_DURATION;
   const canSubmit = file && durationInRange && consent && status !== "uploading";
 
+  // Uploads audio to /analyze, advances step labels on a timer, and stores result on success.
   const submit = async () => {
     setStatus("uploading");
     setError(null);
