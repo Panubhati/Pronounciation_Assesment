@@ -22,5 +22,5 @@ COPY app ./app
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base.en', device='cpu', compute_type='int8')"
 RUN python -c "from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor; m='facebook/wav2vec2-lv-60-espeak-cv-ft'; Wav2Vec2Processor.from_pretrained(m); Wav2Vec2ForCTC.from_pretrained(m)"
 
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8001
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}
