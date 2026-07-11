@@ -1,9 +1,7 @@
 FROM python:3.11-slim
 
 # espeak-ng is a SYSTEM dependency, not a pip package -- phonemizer just
-# shells out to it. This is the #1 thing that breaks on hosts that only
-# give you a Python buildpack (e.g. plain Render "Python" service type).
-# That's why this app deploys via Docker rather than a native buildpack.
+# shells out to it. ffmpeg is needed for audio format conversion.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     espeak-ng \
     ffmpeg \

@@ -1,12 +1,13 @@
 import os
+import platform
 import subprocess
 import tempfile
 import time
 
-# Fix PyTorch/OpenMP duplicate library conflict on Windows.
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-# Tell phonemizer where espeak-ng is installed on this machine.
-os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
+# Platform-specific fixes (Windows local dev only; Docker/Railway runs Linux).
+if platform.system() == "Windows":
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    os.environ["PHONEMIZER_ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,6 +146,3 @@ async def analyze(file: UploadFile = File(...)):
             os.remove(tmp_path)
         if wav_path and os.path.exists(wav_path):
             os.remove(wav_path)
-
-
-
