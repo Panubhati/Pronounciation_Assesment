@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from faster_whisper import WhisperModel
 
-_MODEL_SIZE = "base.en"
+_MODEL_SIZE = "tiny.en"
 _model: WhisperModel | None = None
 
 

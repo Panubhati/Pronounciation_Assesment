@@ -23,7 +23,10 @@ MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 app = FastAPI(title="Livo Pronunciation Assessment API")
 
 # Allow requests only from trusted frontend origins; configurable via env var for production.
-allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")  # CORS whitelist
+allowed_origins = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,https://pronounciation-assesment.vercel.app"
+).split(",")  # CORS whitelist
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
